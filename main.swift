@@ -397,6 +397,20 @@ final class BlockerModel: ObservableObject {
 struct ContentView: View {
     @EnvironmentObject var model: BlockerModel
     @State private var showAbout = false
+
+    // 单个模式的状态徽标
+    private func modeStatusBadge(_ title: String, on: Bool) -> some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(on ? Color.green : Color.red)
+                .frame(width: 9, height: 9)
+            Text("\(title)：").font(.subheadline)
+            Text(on ? "已启用" : "未启用")
+                .font(.subheadline.bold())
+                .foregroundStyle(on ? .green : .red)
+        }
+    }
+
     var body: some View {
         VStack(spacing: 14) {
             // 标题栏
@@ -412,13 +426,22 @@ struct ContentView: View {
                 Button("关于") { showAbout = true }
             }
             Divider()
-            HStack {
-                Text("当前状态").font(.headline)
-                Spacer()
-                Text(model.statusText).font(.headline)
-                    .foregroundStyle(model.blocked ? .green : .red)
+            // 顶部：两个模式分别的开启状态 + 总体提示
+            VStack(alignment: .leading, spacing: 8) {
+                Text("模式状态").font(.headline)
+                HStack(spacing: 20) {
+                    modeStatusBadge("更改域名模式", on: model.blocked)
+                    modeStatusBadge("禁止下载模式", on: model.downloadBlockMode)
+                }
+                let overallOn = model.blocked || model.downloadBlockMode
+                Text(overallOn
+                    ? "已启用屏蔽，请打开 workbuddy 检测更新 查看效果"
+                    : "未启用屏蔽：WorkBuddy 仍可直接更新服务")
+                    .font(.headline)
+                    .foregroundStyle(overallOn ? .green : .red)
             }
-            .padding(.vertical, 4)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 2)
 
             // 共享上下文：更新下载目录的三类内容
             VStack(alignment: .leading, spacing: 5) {
@@ -447,9 +470,9 @@ struct ContentView: View {
                         .font(.caption).foregroundStyle(.secondary)
                     Divider()
                     Button(action: { model.enable() }) { Label("启用屏蔽", systemImage: "shield.fill") }
-                        .controlSize(.large).disabled(model.busy).frame(maxWidth: .infinity, alignment: .leading)
+                        .controlSize(.large).disabled(model.blocked || model.busy).frame(maxWidth: .infinity, alignment: .leading)
                     Button(action: { model.disable() }) { Label("禁用屏蔽", systemImage: "shield.slash") }
-                        .controlSize(.large).disabled(model.busy).frame(maxWidth: .infinity, alignment: .leading)
+                        .controlSize(.large).disabled(!model.blocked || model.busy).frame(maxWidth: .infinity, alignment: .leading)
                     Button(action: { model.restartWorkBuddy() }) { Label("重启 WorkBuddy", systemImage: "arrow.clockwise") }
                         .controlSize(.large).frame(maxWidth: .infinity, alignment: .leading)
                     Button(action: { model.locateAndCheck() }) { Label("检查更新下载目录", systemImage: "magnifyingglass") }
@@ -530,7 +553,7 @@ struct AboutView: View {
                 Image(nsImage: img).resizable().frame(width: 72, height: 72)
             }
             Text("WorkBuddy 更新屏蔽器").font(.title3.bold())
-            Text("版本 1.8").font(.caption).foregroundStyle(.secondary)
+            Text("版本 1.9").font(.caption).foregroundStyle(.secondary)
             Text("通过 /etc/hosts 屏蔽 \(kBlockedDomain)，阻断 WorkBuddy 自动更新下载。\n不修改 WorkBuddy 应用本体，可随时还原。")
                 .font(.callout).multilineTextAlignment(.center).frame(maxWidth: 320)
             Divider()
