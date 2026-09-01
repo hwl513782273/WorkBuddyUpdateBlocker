@@ -22,7 +22,6 @@ struct WBBlockerApp: App {
                 .frame(minWidth: 760, minHeight: 680)
                 .onAppear { model.refresh(); model.applyPersisted() }
         }
-        .windowResizability(.contentSize)
     }
 }
 
