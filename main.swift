@@ -14,14 +14,38 @@ let kExtractedDir = kCacheBase + "/extracted"
 // MARK: - App 入口
 @main
 struct WBBlockerApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var model = BlockerModel()
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environmentObject(model)
-                .frame(minWidth: 760, minHeight: 680)
                 .onAppear { model.refresh(); model.applyPersisted() }
         }
+    }
+}
+
+// 锁定窗口：禁止手动缩放，固定为「自适应缩放」后的尺寸（不同分辨率机子等比缩小，不出现滚动条）
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    // 设计基准尺寸（ContentView 与窗口共用）
+    static let DESIGN_W: CGFloat = 720
+    static let DESIGN_H: CGFloat = 840
+    // 根据主屏可见区计算等比缩放比例（最大 1.0，超出则缩小）
+    static var adaptiveScale: CGFloat {
+        guard let screen = NSScreen.main else { return 1 }
+        let vf = screen.visibleFrame
+        return min(1.0, (vf.height * 0.90) / DESIGN_H, (vf.width * 0.92) / DESIGN_W)
+    }
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        guard let win = NSApp.windows.first else { return }
+        let s = Self.adaptiveScale
+        let w = Self.DESIGN_W * s
+        let h = Self.DESIGN_H * s
+        win.styleMask.remove(.resizable)
+        win.setContentSize(NSSize(width: w, height: h))
+        win.contentMinSize = NSSize(width: w, height: h)
+        win.contentMaxSize = NSSize(width: w, height: h)
+        win.center()
     }
 }
 
@@ -33,12 +57,13 @@ final class BlockerModel: ObservableObject {
     @Published var busy = false
     @Published var checkResult = ""
 
-    // 自动备份 / 禁止下载模式 状态（持久化到 UserDefaults）
-    @Published var backupEnabled: Bool = UserDefaults.standard.bool(forKey: "wbBackupEnabled")
+    // 手动备份 / 禁止下载模式 状态（持久化到 UserDefaults）
     @Published var backupFolder: String = UserDefaults.standard.string(forKey: "wbBackupFolder") ?? ""
     // 禁止下载模式：合并锁定 downloads/ 与 extracted/ 两个目录（与自动备份互斥）
     @Published var downloadBlockMode: Bool = UserDefaults.standard.bool(forKey: "wbDownloadBlockMode")
     @Published var lastBackupLog: String = ""
+    @Published var toastText: String = ""          // 1 秒浮窗提示
+    private var toastWorkItem: DispatchWorkItem?
     private var backupSource: DispatchSourceFileSystemObject?
 
     func refresh() {
@@ -100,29 +125,23 @@ final class BlockerModel: ObservableObject {
         }
     }
 
-    // 切换自动检查 / 备份开关（与「禁止读写」互斥）
-    func toggleBackup() {
-        if !backupEnabled {
-            if backupFolder.isEmpty {
-                message = "请先点击「选择备份目录」设定目标文件夹，再启用自动检查。"
-                return
-            }
-            backupEnabled = true
-            UserDefaults.standard.set(true, forKey: "wbBackupEnabled")
-            // 互斥：打开自动检查则关闭禁止下载模式（同时解锁两个目录）
+    // 手动备份一次：检查下载目录，新包备份到 backupFolder、重复包移废纸篓、清理解压暂存（与「禁止下载模式」互斥）
+    func manualBackup() {
+        if backupFolder.isEmpty {
+            message = "请先点击「选择备份目录」设定目标文件夹，再手动备份。"
+            return
+        }
+        // 互斥：执行手动备份则关闭禁止下载模式（同时解锁两个目录，保证能访问 downloads/）
+        if downloadBlockMode {
             downloadBlockMode = false
             UserDefaults.standard.set(false, forKey: "wbDownloadBlockMode")
             setLock(false, silent: true)
             setExtractedLock(false, silent: true)
-            startBackupWatcher()
-            processDownloads()
-            message = "已启用自动检查：下载目录里的新更新包会备份到\n\(backupFolder)\n与备份目录同名的重复包会移入废纸篓。"
-        } else {
-            backupEnabled = false
-            UserDefaults.standard.set(false, forKey: "wbBackupEnabled")
-            stopBackupWatcher()
-            message = "已停止自动检查（已备份的文件仍保留在目标文件夹）。"
         }
+        processDownloads()
+        cleanExtractedTemp()
+        showToast("请重新开启屏蔽")
+        message = "已手动备份：下载目录里的新更新包已备份到\n\(backupFolder)\n与备份目录同名的重复包已移入废纸篓，并清理了解压暂存 extracted/。\n（如需持续屏蔽，请重新开启「禁止下载模式」或「更改域名模式」）"
     }
 
     // 启动对下载目录的监听（新增文件即触发检查）
@@ -192,16 +211,52 @@ final class BlockerModel: ObservableObject {
         }
     }
 
+    // 1 秒浮窗提示（自动消失）
+    func showToast(_ text: String, seconds: Double = 1.0) {
+        DispatchQueue.main.async {
+            self.toastText = text
+            self.toastWorkItem?.cancel()
+            let item = DispatchWorkItem { self.toastText = "" }
+            self.toastWorkItem = item
+            DispatchQueue.main.asyncAfter(deadline: .now() + seconds, execute: item)
+        }
+    }
+
+    // 将目录内容整体移入废纸篓（可恢复），返回移走的数量
+    private func trashContents(of dir: String) -> Int {
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: dir) else { return 0 }
+        guard let items = try? fm.contentsOfDirectory(atPath: dir) else { return 0 }
+        var n = 0
+        for it in items {
+            let p = (dir as NSString).appendingPathComponent(it)
+            do { try fm.trashItem(at: URL(fileURLWithPath: p), resultingItemURL: nil); n += 1 } catch {}
+        }
+        return n
+    }
+
+    // 清理解压暂存目录 extracted/ 的内容（移入废纸篓，可恢复）
+    func cleanExtractedTemp() {
+        _ = trashContents(of: kExtractedDir)
+    }
+
+    // 手动清理：下载缓存 downloads/ 与解压暂存 extracted/（移入废纸篓，可恢复）
+    func manualClean() {
+        let d = trashContents(of: kDownloadDir)
+        let e = trashContents(of: kExtractedDir)
+        let total = d + e
+        DispatchQueue.main.async {
+            self.message = "已清理 downloads/（\(d) 项）与 extracted/（\(e) 项），共 \(total) 项移入废纸篓（可恢复）。"
+            self.showToast("已清理下载缓存与解压暂存，请重新开启屏蔽")
+        }
+    }
+
     // MARK: - 禁止下载模式（合并锁定 downloads/ 与 extracted/）
 
     func enableDownloadBlock() {
         guard !downloadBlockMode else { return }
         downloadBlockMode = true
         UserDefaults.standard.set(true, forKey: "wbDownloadBlockMode")
-        // 互斥：启用禁止下载则关闭自动备份
-        backupEnabled = false
-        UserDefaults.standard.set(false, forKey: "wbBackupEnabled")
-        stopBackupWatcher()
         setLock(true, silent: true)
         setExtractedLock(true, silent: true)
         message = "已启用「禁止下载模式」：downloads/ 与 extracted/ 目录权限均设为 000，WorkBuddy 无法写入更新包或解压暂存，下载与解压安装被双重阻断。"
@@ -222,12 +277,10 @@ final class BlockerModel: ObservableObject {
         if downloadBlockMode {
             setLock(true, silent: true)
             setExtractedLock(true, silent: true)
-            backupEnabled = false   // 确保互斥
         } else {
             setLock(false, silent: true)
             setExtractedLock(false, silent: true)
-            if backupEnabled, !backupFolder.isEmpty { startBackupWatcher() }
-            processDownloads()       // 关闭读写锁即自动检查
+            processDownloads()       // 启动时检查一次
         }
     }
 
@@ -397,6 +450,10 @@ final class BlockerModel: ObservableObject {
 struct ContentView: View {
     @EnvironmentObject var model: BlockerModel
     @State private var showAbout = false
+    // 固定设计尺寸 + 自适应缩放（不同分辨率机子等比缩小，无滚动条）
+    private let DESIGN_W: CGFloat = AppDelegate.DESIGN_W
+    private let DESIGN_H: CGFloat = AppDelegate.DESIGN_H
+    private var scale: CGFloat { AppDelegate.adaptiveScale }
 
     // 单个模式的状态徽标
     private func modeStatusBadge(_ title: String, on: Bool) -> some View {
@@ -495,10 +552,11 @@ struct ContentView: View {
                         .controlSize(.large).disabled(model.downloadBlockMode).frame(maxWidth: .infinity, alignment: .leading)
                     Button(action: { model.disableDownloadBlock() }) { Label("禁用屏蔽", systemImage: "shield.slash") }
                         .controlSize(.large).disabled(!model.downloadBlockMode).frame(maxWidth: .infinity, alignment: .leading)
-                    Text("同时锁定 downloads/ 与 extracted/（chmod 000）。与「自动备份」互斥。")
+                    Text("同时锁定 downloads/ 与 extracted/（chmod 000）。与「手动备份」互斥。")
                         .font(.caption2).foregroundStyle(.secondary)
                     Divider()
-                    Toggle("自动备份更新包", isOn: Binding(get: { model.backupEnabled }, set: { _ in model.toggleBackup() }))
+                    Button(action: { model.manualBackup() }) { Label("手动备份更新包", systemImage: "arrow.down.doc") }
+                        .controlSize(.large).frame(maxWidth: .infinity, alignment: .leading)
                     HStack(spacing: 8) {
                         Button("选择备份目录") { model.chooseBackupFolder() }
                         if !model.backupFolder.isEmpty {
@@ -510,7 +568,14 @@ struct ContentView: View {
                     if !model.lastBackupLog.isEmpty {
                         Text(model.lastBackupLog).font(.caption2).foregroundStyle(.green)
                     }
-                    Text("启用后自动检查下载目录：新的 .zip 备份到上方文件夹；与备份目录同名的重复包移入废纸篓。")
+                    Text("点击后立即执行：检查下载目录，新的 .zip 备份到上方文件夹；与备份目录同名的重复包移入废纸篓，并清理解压暂存 extracted/。")
+                        .font(.caption2).foregroundStyle(.secondary)
+                    Divider()
+                    Button(action: { model.manualClean() }) {
+                        Label("手动清理下载缓存与解压暂存", systemImage: "trash")
+                    }
+                    .controlSize(.large).frame(maxWidth: .infinity, alignment: .leading)
+                    Text("立即将 downloads/ 与 extracted/ 内的更新包 / 解压暂存全部移入废纸篓（可恢复），不影响当前屏蔽设置。")
                         .font(.caption2).foregroundStyle(.secondary)
                 }
                 .padding(12)
@@ -518,28 +583,50 @@ struct ContentView: View {
                 .background(RoundedRectangle(cornerRadius: 10).fill(Color.gray.opacity(0.10)))
             }
 
+            // message 区：仅非空时显示（空时不占位，避免底部留白）
             if !model.message.isEmpty {
-                Text(model.message).font(.callout).foregroundStyle(.blue)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text(model.message)
+                    .font(.callout).foregroundStyle(.blue)
+                    .frame(maxWidth: .infinity, minHeight: 38, maxHeight: 38, alignment: .topLeading)
+                    .lineLimit(2)
                     .padding(8)
                     .background(RoundedRectangle(cornerRadius: 8).fill(Color.blue.opacity(0.1)))
             }
 
-            Spacer()
-
+            // checkResult 区：仅非空时显示（按「检查更新下载目录」后才有内容）
             if !model.checkResult.isEmpty {
                 Text(model.checkResult)
                     .font(.callout)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(maxWidth: .infinity, minHeight: 42, maxHeight: 42, alignment: .topLeading)
+                    .lineLimit(3)
                     .padding(8)
                     .background(RoundedRectangle(cornerRadius: 8).fill(Color.gray.opacity(0.12)))
             }
 
-            Spacer()
+            Spacer(minLength: 0)
             Text("Copyright © 2026 banqiu. Released under the MIT License.")
                 .font(.caption2).foregroundStyle(.secondary)
         }
         .padding(22)
+        .frame(width: DESIGN_W, height: DESIGN_H)
+        .scaleEffect(scale)
+        .frame(width: DESIGN_W * scale, height: DESIGN_H * scale)
+        .overlay(alignment: .top) {
+            if !model.toastText.isEmpty {
+                Text(model.toastText)
+                    .font(.headline)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 18).padding(.vertical, 10)
+                    .background(RoundedRectangle(cornerRadius: 12).fill(Color.black.opacity(0.82)))
+                    .foregroundStyle(.white)
+                    .shadow(color: .black.opacity(0.3), radius: 6, x: 0, y: 3)
+                    .offset(y: 56)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: model.toastText)
+        .animation(.easeInOut(duration: 0.2), value: model.message)
+        .animation(.easeInOut(duration: 0.2), value: model.checkResult)
         .sheet(isPresented: $showAbout) { AboutView() }
     }
 }
@@ -553,7 +640,7 @@ struct AboutView: View {
                 Image(nsImage: img).resizable().frame(width: 72, height: 72)
             }
             Text("WorkBuddy 更新屏蔽器").font(.title3.bold())
-            Text("版本 1.9").font(.caption).foregroundStyle(.secondary)
+            Text("版本 1.17").font(.caption).foregroundStyle(.secondary)
             Text("通过 /etc/hosts 屏蔽 \(kBlockedDomain)，阻断 WorkBuddy 自动更新下载。\n不修改 WorkBuddy 应用本体，可随时还原。")
                 .font(.callout).multilineTextAlignment(.center).frame(maxWidth: 320)
             Divider()
