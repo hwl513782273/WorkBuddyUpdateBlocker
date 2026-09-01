@@ -20,7 +20,8 @@
 - 一键**启用屏蔽 / 禁用屏蔽**（系统密码框授权，需管理员权限写 `/etc/hosts`）。
 - **重启 WorkBuddy** 按钮：屏蔽后立即重启让配置生效。
 - **检查更新下载目录**：在 Finder 打开 WorkBuddy 自动下载更新包落地的本地目录，并列出其中三类内容（downloads / extracted / backups）。
-- **自动备份更新包**：将下载目录里新的 `.zip` 更新包备份到用户指定文件夹；与「禁止下载模式」互斥（启用禁止下载则自动关闭备份）。
+- **手动备份更新包**：点击后将下载目录里新的 `.zip` 更新包备份到用户指定文件夹；与「禁止下载模式」互斥（启用禁止下载则自动关闭备份），并同步清理解压暂存 `extracted/`、用 1 秒浮窗提示「请重新开启屏蔽」。
+- **手动清理下载缓存与解压暂存**：一键将 `downloads/`（下载缓存）与 `extracted/`（解压暂存）移入废纸篓。
 - 原生 SwiftUI 单文件 App，拖入「应用程序」即用，**无依赖脚本、无常驻后台进程**。
 
 ### 快速开始
@@ -37,10 +38,10 @@ codesign --force --deep --sign - "WorkBuddy更新屏蔽器.app"
 ```
 
 ### macOS 版本选择
-- **Apple Silicon（M1 及更新）**：下载 `11.0-WorkBuddyUpdateBlocker-1.9-arm64.dmg`（纯 arm64，macOS 11.0+）。
-- **Intel（x86_64）**：下载 `12.0-WorkBuddyUpdateBlocker-1.9-x86_64.dmg`（macOS 12.0+，已在 Intel 真机实测通过）。
+- **Apple Silicon（M1 及更新）**：下载 `11.0-WorkBuddyUpdateBlocker-1.17-arm64.dmg`（纯 arm64，macOS 11.0+）。
+- **Intel（x86_64）**：下载 `12.0-WorkBuddyUpdateBlocker-1.17-x86_64.dmg`（macOS 12.0+，已在 Intel 真机实测通过）。
 
-> 发行版 DMG 为 ad-hoc 签名、**未公证（notarized）**，首次打开请右键「打开」放行 Gatekeeper。命名格式为：`支持最低版本-软件名-版本-架构`（如 `11.0-WorkBuddyUpdateBlocker-1.9-arm64.dmg`）。
+> 发行版 DMG 为 ad-hoc 签名、**未公证（notarized）**，首次打开请右键「打开」放行 Gatekeeper。命名格式为：`支持最低版本-软件名-版本-架构`（如 `11.0-WorkBuddyUpdateBlocker-1.17-arm64.dmg`）。
 
 ### 工作原理
 - **更改域名模式（网络层）**：更新包实际下载自 `download.codebuddy.cn`（更新日志已证实）。将其解析到 `0.0.0.0` 后，WorkBuddy 拉取更新时连接失败，更新被阻断；而 AI / 账户后端走 `copilot.tencent.com`，**不屏蔽**，核心功能不受影响。
@@ -50,7 +51,7 @@ codesign --force --deep --sign - "WorkBuddy更新屏蔽器.app"
 ### 差异化亮点
 - 🛡 **双保险阻断**：网络层（hosts 域名屏蔽）+ 文件系统层（目录权限锁）任选或叠加，比单纯改配置更彻底。
 - 🧰 **图形化一键操作**：启用 / 禁用屏蔽、检查下载目录、重启 WorkBuddy，全部按钮完成，告别命令行。
-- 🔄 **自动备份更新包**：下载目录里出现新 `.zip` 自动备份到指定文件夹，重复包移入废纸篓（可恢复），不误删。
+- 🔄 **手动备份更新包**：点击后把下载目录里新 `.zip` 备份到指定文件夹，重复包移入废纸篓（可恢复），并同步清理解压暂存、用浮窗提示重新开启屏蔽，不误删。
 - 🔒 **全本地、零上传**：所有操作在你的 Mac 上完成，不依赖云端、不联网也能跑。
 - 📦 **原生单文件 App，零依赖**：拖入「应用程序」即用，没有 install 脚本、没有常驻后台进程、不污染系统。
 - 🪟 **过程透明可审计**：写 `/etc/hosts` 与 `chmod` 均弹系统密码框授权，所执行操作在界面日志中透明可见。
@@ -71,7 +72,7 @@ codesign --force --deep --sign - "WorkBuddy更新屏蔽器.app"
 - One-click **Enable / Disable blocking** (system password prompt, requires admin to write `/etc/hosts`).
 - **Restart WorkBuddy** button to apply changes immediately.
 - **Inspect download directory**: opens the local folder where WorkBuddy drops updates in Finder and lists its three categories (downloads / extracted / backups).
-- **Auto-backup updates**: backs up new `.zip` packages to a user-chosen folder; mutually exclusive with Block-download mode.
+- **Manual-backup updates**: backs up new `.zip` packages to a user-chosen folder; mutually exclusive with Block-download mode.
 - Native SwiftUI single-file app — drag into Applications and it just works, **no helper scripts, no background daemons**.
 
 ### Quick start
@@ -88,10 +89,10 @@ codesign --force --deep --sign - "WorkBuddy更新屏蔽器.app"
 ```
 
 ### Choose a macOS build
-- **Apple Silicon (M1 or newer)**: use `11.0-WorkBuddyUpdateBlocker-1.9-arm64.dmg` (arm64 only, macOS 11.0+).
-- **Intel (x86_64)**: use `12.0-WorkBuddyUpdateBlocker-1.9-x86_64.dmg` (macOS 12.0+; tested and verified on a real Intel Mac).
+- **Apple Silicon (M1 or newer)**: use `11.0-WorkBuddyUpdateBlocker-1.17-arm64.dmg` (arm64 only, macOS 11.0+).
+- **Intel (x86_64)**: use `12.0-WorkBuddyUpdateBlocker-1.17-x86_64.dmg` (macOS 12.0+; tested and verified on a real Intel Mac).
 
-> Release DMGs are ad-hoc signed and **not notarized**; right-click "Open" on first launch to bypass Gatekeeper. Release asset naming: `min-version-appname-version-arch` (e.g. `11.0-WorkBuddyUpdateBlocker-1.9-arm64.dmg`).
+> Release DMGs are ad-hoc signed and **not notarized**; right-click "Open" on first launch to bypass Gatekeeper. Release asset naming: `min-version-appname-version-arch` (e.g. `11.0-WorkBuddyUpdateBlocker-1.17-arm64.dmg`).
 
 ### How it works
 - **Change-domain mode (network layer)**: the update package is actually downloaded from `download.codebuddy.cn` (confirmed via update logs). Resolving it to `0.0.0.0` makes WorkBuddy fail to fetch updates; the AI / account backend on `copilot.tencent.com` is **not** blocked, so core features keep working.
@@ -101,7 +102,7 @@ codesign --force --deep --sign - "WorkBuddy更新屏蔽器.app"
 ### Why this tool
 - 🛡 **Double protection**: network-layer (hosts domain block) + filesystem-layer (directory permission lock), either alone or combined — more thorough than config edits.
 - 🧰 **GUI one-click ops**: enable / disable blocking, inspect the download dir, restart WorkBuddy — all buttons, no terminal needed.
-- 🔄 **Auto-backup updates**: new `.zip` in the download dir is auto-backed-up; duplicates go to Trash (recoverable), never hard-deleted.
+- 🔄 **Manual-backup updates**: new `.zip` in the download dir is backed-up on demand; duplicates go to Trash (recoverable), never hard-deleted.
 - 🔒 **Fully local, zero upload**: everything runs on your Mac — no cloud dependency.
 - 📦 **Native single-file app, zero dependencies**: drag into Applications and it just works; no install scripts, no background daemons.
 - 🪟 **Transparent, auditable**: writing `/etc/hosts` and `chmod` both prompt for the admin password; operations are shown transparently in the UI log.
