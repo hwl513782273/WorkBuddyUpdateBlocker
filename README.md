@@ -37,10 +37,10 @@ codesign --force --deep --sign - "WorkBuddy更新屏蔽器.app"
 ```
 
 ### macOS 版本选择
-- **Apple Silicon（M1 及更新）**：下载 `11.0-WorkBuddy更新屏蔽器-1.8-arm64.dmg`（纯 arm64，macOS 11.0+）。
-- 当前仅提供 Apple Silicon 构建；如需 Intel（x86_64）版本可提 Issue，由同一套源码经 `-target` 注入构建。
+- **Apple Silicon（M1 及更新）**：下载 `11.0-WorkBuddyUpdateBlocker-1.9-arm64.dmg`（纯 arm64，macOS 11.0+）。
+- **Intel（x86_64）**：下载 `12.0-WorkBuddyUpdateBlocker-1.9-x86_64.dmg`（macOS 12.0+，已在 Intel 真机实测通过）。
 
-> 发行版 DMG 为 ad-hoc 签名、**未公证（notarized）**，首次打开请右键「打开」放行 Gatekeeper。命名格式为：`支持最低版本-软件名-版本-架构`（如 `11.0-WorkBuddy更新屏蔽器-1.8-arm64.dmg`）。
+> 发行版 DMG 为 ad-hoc 签名、**未公证（notarized）**，首次打开请右键「打开」放行 Gatekeeper。命名格式为：`支持最低版本-软件名-版本-架构`（如 `11.0-WorkBuddyUpdateBlocker-1.9-arm64.dmg`）。
 
 ### 工作原理
 - **更改域名模式（网络层）**：更新包实际下载自 `download.codebuddy.cn`（更新日志已证实）。将其解析到 `0.0.0.0` 后，WorkBuddy 拉取更新时连接失败，更新被阻断；而 AI / 账户后端走 `copilot.tencent.com`，**不屏蔽**，核心功能不受影响。
@@ -88,10 +88,10 @@ codesign --force --deep --sign - "WorkBuddy更新屏蔽器.app"
 ```
 
 ### Choose a macOS build
-- **Apple Silicon (M1 or newer)**: use `11.0-WorkBuddy更新屏蔽器-1.8-arm64.dmg` (arm64 only, macOS 11.0+).
-- Only the Apple Silicon build is provided for now; an Intel (x86_64) build can be produced from the same source via `-target` injection on request.
+- **Apple Silicon (M1 or newer)**: use `11.0-WorkBuddyUpdateBlocker-1.9-arm64.dmg` (arm64 only, macOS 11.0+).
+- **Intel (x86_64)**: use `12.0-WorkBuddyUpdateBlocker-1.9-x86_64.dmg` (macOS 12.0+; tested and verified on a real Intel Mac).
 
-> Release DMGs are ad-hoc signed and **not notarized**; right-click "Open" on first launch to bypass Gatekeeper. Release asset naming: `min-version-appname-version-arch` (e.g. `11.0-WorkBuddy更新屏蔽器-1.8-arm64.dmg`).
+> Release DMGs are ad-hoc signed and **not notarized**; right-click "Open" on first launch to bypass Gatekeeper. Release asset naming: `min-version-appname-version-arch` (e.g. `11.0-WorkBuddyUpdateBlocker-1.9-arm64.dmg`).
 
 ### How it works
 - **Change-domain mode (network layer)**: the update package is actually downloaded from `download.codebuddy.cn` (confirmed via update logs). Resolving it to `0.0.0.0` makes WorkBuddy fail to fetch updates; the AI / account backend on `copilot.tencent.com` is **not** blocked, so core features keep working.
