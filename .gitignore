@@ -1,0 +1,7 @@
+# 构建产物 / Build artifacts
+*.app/
+*.dmg
+*.log
+
+# 系统 / OS
+.DS_Store
