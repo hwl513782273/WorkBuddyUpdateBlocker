@@ -56,8 +56,11 @@ codesign --force --deep --sign - "WorkBuddy更新屏蔽器.app"
 ```
 
 ### macOS 版本选择
-- **Apple Silicon（M1 及更新）**：下载 `11.0-WorkBuddyUpdateBlocker-1.19-arm64.dmg`（纯 arm64，macOS 11.0+）。
-- **Intel（x86_64）**：下载 `12.0-WorkBuddyUpdateBlocker-1.19-x86_64.dmg`（macOS 12.0+）。
+
+👉 **[下载最新版 v1.19](https://github.com/hwl513782273/WorkBuddyUpdateBlocker/releases/tag/v1.19)**
+
+- **Apple Silicon（M1 及更新）**：[11.0-WorkBuddyUpdateBlocker-1.19-arm64.dmg](https://github.com/hwl513782273/WorkBuddyUpdateBlocker/releases/download/v1.19/11.0-WorkBuddyUpdateBlocker-1.19-arm64.dmg)（纯 arm64，macOS 11.0+）
+- **Intel（x86_64）**：[12.0-WorkBuddyUpdateBlocker-1.19-x86_64.dmg](https://github.com/hwl513782273/WorkBuddyUpdateBlocker/releases/download/v1.19/12.0-WorkBuddyUpdateBlocker-1.19-x86_64.dmg)（macOS 12.0+）
 
 > 发行版 DMG 为 ad-hoc 签名、**未公证（notarized）**，首次打开请右键「打开」放行 Gatekeeper。命名格式：`支持最低版本-软件名-版本-架构`。
 
@@ -109,8 +112,11 @@ WorkBuddy（Electron + electron-updater）把更新包下载到 `~/Library/Cache
 5. To restore updating, click **解除目录锁**.
 
 ### Choose a build
-- **Apple Silicon**: `11.0-WorkBuddyUpdateBlocker-1.19-arm64.dmg` (macOS 11.0+).
-- **Intel**: `12.0-WorkBuddyUpdateBlocker-1.19-x86_64.dmg` (macOS 12.0+).
+
+👉 **[Download v1.19](https://github.com/hwl513782273/WorkBuddyUpdateBlocker/releases/tag/v1.19)**
+
+- **Apple Silicon**: [11.0-WorkBuddyUpdateBlocker-1.19-arm64.dmg](https://github.com/hwl513782273/WorkBuddyUpdateBlocker/releases/download/v1.19/11.0-WorkBuddyUpdateBlocker-1.19-arm64.dmg) (macOS 11.0+)
+- **Intel**: [12.0-WorkBuddyUpdateBlocker-1.19-x86_64.dmg](https://github.com/hwl513782273/WorkBuddyUpdateBlocker/releases/download/v1.19/12.0-WorkBuddyUpdateBlocker-1.19-x86_64.dmg) (macOS 12.0+)
 
 > Release DMGs are ad-hoc signed and **not notarized**; right-click "Open" on first launch.
 
